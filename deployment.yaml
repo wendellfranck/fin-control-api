@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fincontrol-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fincontrol-api
+  template:
+    metadata:
+      labels:
+        app: fincontrol-api
+    spec:
+      containers:
+        - name: fincontrol-api
+          image: fincontrolregistry.azurecr.io/fincontrol-api:v1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://c-fin-control-db.objlpv25mhca34.postgres.cosmos.azure.com:5432/fin-control-db-prod"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "citus"
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "FinControl123@!"
