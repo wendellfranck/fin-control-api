@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: fincontrol-api
-          image: fincontrolregistry.azurecr.io/fincontrol-api:v1
+          image: fincontrolregistry.azurecr.io/fincontrol-api:v2
           ports:
             - containerPort: 8080
           env:
