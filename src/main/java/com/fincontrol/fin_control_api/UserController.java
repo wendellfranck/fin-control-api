@@ -4,66 +4,148 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 @RestController
+@RequestMapping("/users")
 public class UserController {
 
     @Autowired
     private DataSource dataSource;
 
-    // GET /users - lista todos os usuários do banco
-    @GetMapping("/users")
-    public List<User> getUsers() {
+    // GET /users - lista todos os usuários
+    @GetMapping
+    public List<User> getAllUsers() {
         List<User> users = new ArrayList<>();
+        String sql = "SELECT user_id, username, email, password_hash FROM users_schema.users";
 
-        try (Connection conn = dataSource.getConnection()) {
-            String sql = "SELECT user_id, username, email, password_hash FROM users_schema.users";
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(sql);
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
-                int id = rs.getInt("user_id");
-                String username = rs.getString("username");
-                String email = rs.getString("email");
-                String passwordHash = rs.getString("password_hash");
-
-                users.add(new User(id, username, email, passwordHash));
+                users.add(new User(
+                        rs.getInt("user_id"),
+                        rs.getString("username"),
+                        rs.getString("email"),
+                        rs.getString("password_hash")
+                ));
             }
 
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
         return users;
     }
 
+    // GET /users/{id} - busca usuário pelo ID
+    @GetMapping("/{id}")
+    public User getUserById(@PathVariable int id) {
+        String sql = "SELECT user_id, username, email, password_hash FROM users_schema.users WHERE user_id = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return new User(
+                        rs.getInt("user_id"),
+                        rs.getString("username"),
+                        rs.getString("email"),
+                        rs.getString("password_hash")
+                );
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null; // ou lançar exception customizada
+    }
+
     // POST /users - cria um novo usuário
-    @PostMapping("/users")
+    @PostMapping
     public String createUser(@RequestBody User user) {
-        try (Connection conn = dataSource.getConnection()) {
-            String sql = "INSERT INTO users_schema.users (user_id, username, email, password_hash) VALUES (?, ?, ?, ?)";
-            PreparedStatement stmt = conn.prepareStatement(sql);
+        String sql = "INSERT INTO users_schema.users (user_id, username, email, password_hash) VALUES (?, ?, ?, ?)";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
             stmt.setInt(1, user.getUser_id());
             stmt.setString(2, user.getUsername());
             stmt.setString(3, user.getEmail());
-            stmt.setString(4, user.getPassword()); // Aqui o JSON ainda envia "password"
+            stmt.setString(4, user.getPassword());
 
             int rows = stmt.executeUpdate();
-            if (rows > 0) {
-                return "Usuário criado com sucesso!";
-            }
+            return rows > 0 ? "Usuário criado com sucesso!" : "Não foi possível criar o usuário.";
+
         } catch (SQLException e) {
             e.printStackTrace();
             return "Erro ao criar usuário: " + e.getMessage();
         }
-        return "Não foi possível criar o usuário";
+    }
+
+    // PUT /users/{id} - atualiza parcialmente um usuário
+    @PutMapping("/{id}") // PATCH é mais semântico para updates parciais
+    public String updateUserPartial(@PathVariable int id, @RequestBody User user) {
+        // Lista para campos e valores
+        List<String> fields = new ArrayList<>();
+        List<Object> values = new ArrayList<>();
+
+        if (user.getUsername() != null) {
+            fields.add("username = ?");
+            values.add(user.getUsername());
+        }
+        if (user.getEmail() != null) {
+            fields.add("email = ?");
+            values.add(user.getEmail());
+        }
+        if (user.getPassword() != null) {
+            fields.add("password_hash = ?");
+            values.add(user.getPassword());
+        }
+
+        if (fields.isEmpty()) {
+            return "Nenhum campo para atualizar.";
+        }
+
+        String sql = "UPDATE users_schema.users SET " + String.join(", ", fields) + " WHERE user_id = ?";
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            // Preencher os valores dinamicamente
+            for (int i = 0; i < values.size(); i++) {
+                stmt.setObject(i + 1, values.get(i));
+            }
+            stmt.setInt(values.size() + 1, id);
+
+            int rows = stmt.executeUpdate();
+            return rows > 0 ? "Usuário atualizado com sucesso!" : "Usuário não encontrado.";
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "Erro ao atualizar usuário: " + e.getMessage();
+        }
+    }
+
+
+    // DELETE /users/{id} - remove um usuário
+    @DeleteMapping("/{id}")
+    public String deleteUser(@PathVariable int id) {
+        String sql = "DELETE FROM users_schema.users WHERE user_id = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+            int rows = stmt.executeUpdate();
+            return rows > 0 ? "Usuário deletado com sucesso!" : "Usuário não encontrado.";
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "Erro ao deletar usuário: " + e.getMessage();
+        }
     }
 
     // Classe interna User
@@ -71,9 +153,9 @@ public class UserController {
         private int user_id;
         private String username;
         private String email;
-        private String password; // aqui no JSON continua como "password"
+        private String password;
 
-        public User() {} // Necessário para desserialização do JSON
+        public User() {}
 
         public User(int user_id, String username, String email, String password) {
             this.user_id = user_id;
