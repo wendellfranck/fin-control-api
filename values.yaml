@@ -1,3 +1,26 @@
+# Usar SonarQube Community Build
+community:
+  enabled: true
+
+# Senha obrigatória para monitoramento/Prometheus
+monitoringPasscode: "minhaSenhaSegura123"
+
+# Configuração de serviço do SonarQube
+server:
+  service:
+    type: ClusterIP  # ClusterIP permite port-forward
+    port: 9000       # porta interna do Sonar
+
+# Credenciais do usuário admin
+account:
+  adminPassword: "minhaSenhaSegura123@!"
+
+# Configurações do SonarQube (limite de memória)
+sonarProperties:
+  sonar.web.javaOpts: "-Xmx512m -Xms512m"
+  sonar.ce.javaOpts: "-Xmx512m -Xms512m"
+
+# Arquivos customizados (Prometheus, se você quiser monitorar)
 serverFiles:
   prometheus.yml:
     global:
@@ -7,7 +30,16 @@ serverFiles:
         static_configs:
           - targets: ["52.188.26.21:8080"]
 
-server:
+# Banco de dados PostgreSQL interno (apenas para testes / dev)
+postgresql:
+  enabled: true
+  postgresqlDatabase: sonarqube
+  postgresqlUsername: sonar
+  postgresqlPassword: sonar
   service:
-    type: NodePort
-    nodePort: 30900
+    port: 5432
+
+# Persistência de dados
+persistence:
+  enabled: true
+  size: 5Gi
