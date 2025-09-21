@@ -4,36 +4,23 @@ $projectDir = "C:\Users\conta\Documents\FinControl\fin-control-api"
 Set-Location $projectDir
 
 # Variáveis
-$localImage = "fin-control-api:latest"
-$acrName = "fincontrolregistry.azurecr.io"
-$acrImage = "$acrName/fin-control-api:latest"
-$deploymentName = "fincontrol-api"
-$containerName = "fin-control-api"
+$proj="C:\Users\conta\Documents\FinControl\fin-control-api";
+$img="fin-control-api:latest";
+$acr="fincontrolregistry.azurecr.io/fin-control-api:latest";
+$dep="fincontrol-api";
+$cont="fin-control-api";
 
-Write-Host "`n=== Compilando projeto Maven ==="
-mvn clean package
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Erro na compilação. Abortando."
-    exit 1
-}
-
-Write-Host "`n=== Buildando imagem Docker ==="
-docker build -t $localImage .
-
-Write-Host "`n=== Taggeando imagem para o ACR ==="
-docker tag $localImage $acrImage
-
-Write-Host "`n=== Logando no Azure Container Registry ==="
-az acr login --name fincontrolregistry
-
-Write-Host "`n=== Fazendo push da imagem para o ACR ==="
-docker push $acrImage
-
-Write-Host "`n=== Atualizando deployment no Kubernetes ==="
-kubectl set image deployment/$deploymentName $containerName=$acrImage
-
-Write-Host "`n=== Verificando rollout ==="
-kubectl rollout status deployment/$deploymentName
-
-Write-Host "`n=== Deploy concluído com sucesso! ==="
+cd $proj;
+if (mvn clean package) {
+    if (docker build -t $img .) {
+        if (docker tag $img $acr) {
+            if (az acr login --name fincontrolregistry) {
+                if (docker push $acr) {
+                    if (kubectl set image deployment/$dep $cont=$acr) {
+                        kubectl rollout status deployment/$dep
+                    } else { Write-Host "❌ Falha no set image"; exit 1 }
+                } else { Write-Host "❌ Falha no push"; exit 1 }
+            } else { Write-Host "❌ Falha no login ACR"; exit 1 }
+        } else { Write-Host "❌ Falha no tag Docker"; exit 1 }
+    } else { Write-Host "❌ Falha no build Docker"; exit 1 }
+} else { Write-Host "❌ Falha no Maven"; exit 1 }
